@@ -1,0 +1,141 @@
+import numpy as np
+import random
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from matplotlib.animation import PillowWriter  # For saving as .gif
+from matplotlib import rcParams
+import pandas as pd  # Import pandas for CSV
+
+# --- Global Style Setup ---
+plt.style.use('dark_background')
+rcParams['axes.edgecolor'] = 'white'
+rcParams['axes.labelcolor'] = 'white'
+rcParams['xtick.color'] = 'white'
+rcParams['ytick.color'] = 'white'
+rcParams['figure.facecolor'] = '#0a0a0a'
+rcParams['axes.facecolor'] = '#111111'
+rcParams['font.size'] = 12
+
+# --- Social Norm Operator ---
+def social_norm_operator(strength=0.8):
+    return np.array([[strength, 1 - strength],
+                     [1 - strength, strength]])
+
+# --- Individual Class ---
+class Individual:
+    def __init__(self, p_role, p_norm):
+        self.state = np.array([p_role, p_norm])
+        self.normalize()
+
+    def normalize(self):
+        self.state = self.state / np.linalg.norm(self.state)
+
+    def apply_social_norm(self, norm_operator):
+        self.state = np.dot(norm_operator, self.state)
+        self.normalize()
+
+    def measure_behavior(self):
+        probs = self.state ** 2
+        return np.random.choice(['Role-Conforming', 'Norm-Breaking'], p=probs)
+
+# --- Entangled Social System ---
+class EntangledSocialSystem:
+    def __init__(self, num_pairs, bias_A=0.6, bias_B=0.4):
+        self.group_A = [Individual(bias_A, 1 - bias_A) for _ in range(num_pairs)]
+        self.group_B = [Individual(bias_B, 1 - bias_B) for _ in range(num_pairs)]
+        self.history = []
+
+    def apply_social_norms(self, strength_A, strength_B, entanglement_strength=0.1):
+        norm_op_A = social_norm_operator(strength_A)
+        norm_op_B = social_norm_operator(strength_B)
+
+        for a, b in zip(self.group_A, self.group_B):
+            a.apply_social_norm(norm_op_A)
+            b.apply_social_norm(norm_op_B)
+
+            # Entanglement effect: small mutual adjustment
+            influence = entanglement_strength * (a.state - b.state)
+            a.state -= influence
+            b.state += influence
+            a.normalize()
+            b.normalize()
+
+    def measure_all(self):
+        results = {'A_Role-Conforming': 0, 'A_Norm-Breaking': 0,
+                   'B_Role-Conforming': 0, 'B_Norm-Breaking': 0}
+        for a, b in zip(self.group_A, self.group_B):
+            results['A_' + a.measure_behavior()] += 1
+            results['B_' + b.measure_behavior()] += 1
+        return results
+
+    def simulate_over_time(self, steps, strength_A, strength_B, entanglement_strength=0.1):
+        for _ in range(steps):
+            self.apply_social_norms(strength_A, strength_B, entanglement_strength)
+            self.history.append(self.measure_all())
+
+    def export_to_csv(self, filename="simulation_data.csv"):
+        # Flatten the history and convert to DataFrame
+        data = []
+        for step, record in enumerate(self.history):
+            row = {'Step': step + 1}
+            row.update(record)  # Add A_Role-Conforming, A_Norm-Breaking, etc.
+            data.append(row)
+
+        df = pd.DataFrame(data)
+        df.to_csv(filename, index=False)
+        print(f"Data saved to {filename}")
+
+# --- Main Function ---
+def main(save=True, export_csv=True):
+    system = EntangledSocialSystem(num_pairs=500, bias_A=0.6, bias_B=0.4)
+    system.simulate_over_time(steps=30, strength_A=0.9, strength_B=0.6, entanglement_strength=0.1)
+
+    # Export to CSV
+    if export_csv:
+        system.export_to_csv()  # Save the data as CSV
+
+    labels = ['Role-Conforming', 'Norm-Breaking']
+    fig, ax = plt.subplots()
+
+    def update(frame):
+        ax.clear()
+        data = system.history[frame]
+
+        A_counts = [data['A_Role-Conforming'], data['A_Norm-Breaking']]
+        B_counts = [data['B_Role-Conforming'], data['B_Norm-Breaking']]
+
+        x = np.arange(len(labels))
+        bar_width = 0.35
+
+        ax.bar(x - bar_width / 2, A_counts, bar_width,
+               label='Group A |ψ⟩', color=['#00bfff', '#ff6666'], alpha=0.8)
+        ax.bar(x + bar_width / 2, B_counts, bar_width,
+               label='Group B |ϕ⟩', color=['#66c2ff', '#ff9999'], alpha=0.8)
+
+        ax.set_title(f"Entangled Social Dynamics – Step {frame+1}")
+        ax.set_ylabel("Measured Individuals (|⟨state|behavior⟩|²)")
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels)
+        ax.set_ylim(0, 550)
+        ax.legend(loc='upper center', ncol=2)
+
+        # Annotate bars
+        for i, count in enumerate(A_counts):
+            ax.text(i - bar_width / 2, count + 5, str(count), color='white', ha='center')
+        for i, count in enumerate(B_counts):
+            ax.text(i + bar_width / 2, count + 5, str(count), color='white', ha='center')
+
+    ani = animation.FuncAnimation(fig, update, frames=len(system.history), repeat=False)
+
+    if save:
+        ani.save("entangled_social_simulation.gif", writer=PillowWriter(fps=2))
+        print("Animation saved as entangled_social_simulation.gif")
+    else:
+        plt.show()
+
+    return ani
+
+# --- Run ---
+if __name__ == "__main__":
+    global anim
+    anim = main(save=True)  # Change to False to display instead of save
