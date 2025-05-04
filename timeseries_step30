@@ -1,0 +1,100 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.signal import savgol_filter
+
+# Reset style
+plt.style.use('default')
+
+# Load the CSV file
+file_path = '/Users/shan/Downloads/simulation_data_step30.csv'
+df = pd.read_csv(file_path)
+
+# # Smoothing parameters
+# window_size = 31  # Should be an odd number and less than the number of data points
+# poly_order = 2
+
+# # Apply Savitzky-Golay filter to smooth the data
+# df['A_Role-Conforming_Smooth'] = savgol_filter(df['A_Role-Conforming'], window_size, poly_order)
+# df['A_Norm-Breaking_Smooth'] = savgol_filter(df['A_Norm-Breaking'], window_size, poly_order)
+# df['B_Role-Conforming_Smooth'] = savgol_filter(df['B_Role-Conforming'], window_size, poly_order)
+# df['B_Norm-Breaking_Smooth'] = savgol_filter(df['B_Norm-Breaking'], window_size, poly_order)
+
+
+# Determine valid window size
+min_series_length = min(len(df['A_Role-Conforming']), len(df['A_Norm-Breaking']),
+                        len(df['B_Role-Conforming']), len(df['B_Norm-Breaking']))
+
+# Ensure window size is an odd number and <= length of series
+window_size = min(31, min_series_length if min_series_length % 2 == 1 else min_series_length - 1)
+poly_order = 2
+
+# Apply Savitzky-Golay filter
+df['A_Role-Conforming_Smooth'] = savgol_filter(df['A_Role-Conforming'], window_size, poly_order)
+df['A_Norm-Breaking_Smooth'] = savgol_filter(df['A_Norm-Breaking'], window_size, poly_order)
+df['B_Role-Conforming_Smooth'] = savgol_filter(df['B_Role-Conforming'], window_size, poly_order)
+df['B_Norm-Breaking_Smooth'] = savgol_filter(df['B_Norm-Breaking'], window_size, poly_order)
+
+
+
+
+
+
+# Matplotlib style for publication
+plt.rcParams.update({
+    'font.family': 'sans-serif',
+    'font.size': 10,
+    'axes.edgecolor': 'black',
+    'axes.linewidth': 0.8,
+    'xtick.direction': 'in',
+    'ytick.direction': 'in',
+    'xtick.major.size': 4,
+    'ytick.major.size': 4,
+    'axes.grid': True,
+    'grid.linestyle': '--',
+    'grid.linewidth': 0.4,
+    'grid.alpha': 0.5,
+    'legend.frameon': False
+})
+
+# Plotting setup
+fig, axs = plt.subplots(2, 1, figsize=(6.5, 6), sharex=True)
+
+# Define colors
+colors = {
+    'A_RC': '#1b9e77',
+    'A_NB': '#d95f02',
+    'B_RC': '#7570b3',
+    'B_NB': '#e7298a'
+}
+
+# Plot Group A
+axs[0].plot(df['Step'], df['A_Role-Conforming_Smooth'], label='Role-Conforming', color=colors['A_RC'], linewidth=1.5)
+axs[0].plot(df['Step'], df['A_Norm-Breaking_Smooth'], label='Norm-Breaking', color=colors['A_NB'], linewidth=1.5)
+axs[0].set_ylabel('Count')
+axs[0].set_title('Group A', loc='left')
+axs[0].legend(loc='center left', bbox_to_anchor=(1.01, 0.5), fontsize=9)
+
+# Plot Group B
+axs[1].plot(df['Step'], df['B_Role-Conforming_Smooth'], label='Role-Conforming', color=colors['B_RC'], linewidth=1.5)
+axs[1].plot(df['Step'], df['B_Norm-Breaking_Smooth'], label='Norm-Breaking', color=colors['B_NB'], linewidth=1.5)
+axs[1].set_xlabel('Step')
+axs[1].set_ylabel('Count')
+axs[1].set_title('Group B', loc='left')
+axs[1].legend(loc='center left', bbox_to_anchor=(1.01, 0.5), fontsize=9)
+
+# Clean up axis spines
+for ax in axs:
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+# Main title
+fig.suptitle('Smoothed Time Series of Role-Conforming and Norm-Breaking Behavior by Group', fontsize=12, fontweight='bold', y=0.98)
+
+# Layout
+plt.tight_layout(rect=[0, 0, 1, 0.96])
+
+# Save the figure
+plt.savefig('behavior_trends_30.jpg', dpi=300, bbox_inches='tight', facecolor='white')
+
+# Display the plot
+plt.show()
