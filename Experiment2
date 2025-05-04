@@ -1,0 +1,81 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from matplotlib.animation import PillowWriter
+
+from qiskit import QuantumCircuit
+from qiskit.quantum_info import SparsePauliOp
+from qiskit_ibm_runtime.fake_provider import FakeAlmadenV2
+from qiskit.transpiler import generate_preset_pass_manager
+from qiskit_ibm_runtime import EstimatorV2 as Estimator, EstimatorOptions
+
+
+def get_qc_for_n_qubit_GHZ_state(n: int) -> QuantumCircuit:
+    qc = QuantumCircuit(n)
+    qc.h(0)
+    for i in range(n - 1):
+        qc.cx(i, i + 1)
+    return qc
+
+
+def build_observables(n: int):
+    operator_strings = ["Z" + "I" * i + "Z" + "I" * (n - 2 - i) for i in range(n - 1)]
+    return [SparsePauliOp(op) for op in operator_strings], [f"Z{i}Z{i+1}" for i in range(n - 1)]
+
+
+def transpile_circuit(qc, backend):
+    pm = generate_preset_pass_manager(backend=backend, optimization_level=1)
+    return pm.run(qc)
+
+
+def setup_estimator(backend):
+    options = EstimatorOptions()
+    options.resilience_level = 1
+    options.dynamical_decoupling.enable = True
+    options.dynamical_decoupling.sequence_type = "XY4"
+    return Estimator(backend, options=options)
+
+
+def simulate_quantum_social_dynamics(n=8, steps=15):
+    qc = get_qc_for_n_qubit_GHZ_state(n)
+    backend = FakeAlmadenV2()
+    isa_circuit = transpile_circuit(qc, backend)
+    operators, labels = build_observables(n)
+    mapped_operators = [op.apply_layout(isa_circuit.layout) for op in operators]
+
+    estimator = setup_estimator(backend)
+    history = []
+    for _ in range(steps):
+        job = estimator.run([(isa_circuit, mapped_operators)])
+        result = job.result()[0]
+        values = result.data.evs
+        normalized_values = [v / values[0] for v in values]
+        history.append(normalized_values)
+    return history, labels
+
+
+def animate_simulation(history, labels, output_file="quantum_social_simulation.gif"):
+    x = np.arange(len(labels))
+    fig, ax = plt.subplots()
+    plt.style.use('dark_background')
+
+    def update(frame):
+        ax.clear()
+        values = history[frame]
+        ax.bar(x, values, color="#00bfff", alpha=0.8)
+        ax.set_title(f"Quantum Entanglement Decay – Step {frame + 1}")
+        ax.set_ylabel(r"$\langle Z_i Z_0 \rangle / \langle Z_1 Z_0 \rangle$")
+        ax.set_ylim(0, 1.1)
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels, rotation=45, ha="right")
+        for i, v in enumerate(values):
+            ax.text(i, v + 0.02, f"{v:.2f}", ha="center", color="white")
+
+    ani = animation.FuncAnimation(fig, update, frames=len(history), repeat=False)
+    ani.save(output_file, writer=PillowWriter(fps=2))
+    print(f"Simulation saved as {output_file}")
+
+
+if __name__ == "__main__":
+    history, labels = simulate_quantum_social_dynamics(n=8, steps=15)
+    animate_simulation(history, labels)
